@@ -1,6 +1,6 @@
 use clap::Parser;
+use std::fmt;
 use std::path::PathBuf;
-use std::process::ExitCode;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -10,7 +10,18 @@ pub struct DlessConfig {
     pub file: PathBuf,
 }
 
-pub fn dless(config: DlessConfig) -> ExitCode {
+type Result = std::result::Result<(), DlessError>;
+
+#[derive(Debug, Clone)]
+pub struct DlessError;
+
+impl fmt::Display for DlessError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Error in Dless")
+    }
+}
+
+pub fn dless(config: DlessConfig) -> Result {
     println!("Hello, {:}!", config.file.display());
-    ExitCode::SUCCESS
+    Ok(())
 }

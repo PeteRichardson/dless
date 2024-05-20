@@ -1,8 +1,11 @@
 use clap::Parser;
-use dless::{dless, DlessConfig};
+use dless::{dless, DlessConfig, DlessError};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let config = DlessConfig::parse();
-    dless(config)
+    match dless(config) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(DlessError) => ExitCode::FAILURE,
+    }
 }
