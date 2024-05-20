@@ -1,11 +1,11 @@
 use clap::Parser;
-use dless::{dless, DlessConfig, DlessError};
+use dless::{dless, DlessConfig};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let config = DlessConfig::parse();
-    match dless(config) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(DlessError) => ExitCode::FAILURE,
-    }
+    dless(&config).unwrap_or_else(|err| {
+        eprintln!("Unexpected error: {} - {}", err, config.file.display());
+        ExitCode::FAILURE
+    })
 }

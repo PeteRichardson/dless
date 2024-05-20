@@ -1,8 +1,10 @@
 use clap::Parser;
-use std::fmt;
+use std::fs::File;
+use std::io::{prelude::*, BufReader};
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(version, about)]
 pub struct DlessConfig {
     /// log file to view
@@ -10,18 +12,11 @@ pub struct DlessConfig {
     pub file: PathBuf,
 }
 
-type Result = std::result::Result<(), DlessError>;
+pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std::error::Error>> {
+    let file = File::open(&config.file)?;
 
-#[derive(Debug, Clone)]
-pub struct DlessError;
-
-impl fmt::Display for DlessError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error in Dless")
+    for line in BufReader::new(file).lines() {
+        println!("{}", line?);
     }
-}
-
-pub fn dless(config: DlessConfig) -> Result {
-    println!("Hello, {:}!", config.file.display());
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
