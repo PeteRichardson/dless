@@ -4,7 +4,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    // prelude::{Color, Style},
+    prelude::{Color, Style},
     prelude::{CrosstermBackend, Terminal},
     widgets::{Block, Borders},
 };
@@ -47,6 +47,7 @@ pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std:
     let textlog: Vec<String> = lines_from_file(&config.file);
 
     let mut textarea = TextArea::from(textlog);
+    textarea.set_line_number_style(Style::default().fg(Color::DarkGray));
     textarea.set_block(
         Block::default()
             .borders(Borders::ALL)
