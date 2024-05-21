@@ -1,9 +1,10 @@
 use clap::Parser;
 use crossterm::{
-    event::{self, KeyCode},
+    event::{self},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
+    // prelude::{Color, Style},
     prelude::{CrosstermBackend, Terminal},
     widgets::{Block, Borders},
 };
@@ -14,7 +15,7 @@ use std::io;
 use std::io::BufRead;
 use std::path::Path;
 use std::process::ExitCode;
-use tui_textarea::{CursorMove, Scrolling, TextArea};
+use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 
 #[derive(Parser, Debug, Clone)]
 #[command(version, about)]
@@ -49,6 +50,7 @@ pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std:
     textarea.set_block(
         Block::default()
             .borders(Borders::ALL)
+            //.style(Style::default().fg(Color::Black).bg(Color::White))
             .title(config.file.clone()),
     );
 
@@ -58,31 +60,96 @@ pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std:
         })?;
 
         if event::poll(std::time::Duration::from_millis(16))? {
-            if let event::Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Up | KeyCode::Char('j') => textarea.move_cursor(CursorMove::Down),
-                    KeyCode::Down | KeyCode::Char('k') => textarea.move_cursor(CursorMove::Up),
-                    KeyCode::Right | KeyCode::Char('l') => {
-                        textarea.move_cursor(CursorMove::Forward)
-                    }
-                    KeyCode::Left | KeyCode::Char('h') => textarea.move_cursor(CursorMove::Back),
-                    KeyCode::Char('w') => textarea.move_cursor(CursorMove::WordForward),
-                    //KeyCode::Char('b') => textarea.move_cursor(CursorMove::WordBack),
-                    KeyCode::Char('^') => textarea.move_cursor(CursorMove::Head),
-                    KeyCode::Char('$') => textarea.move_cursor(CursorMove::End),
-                    KeyCode::Char('a') => textarea.move_cursor(CursorMove::Forward),
-                    KeyCode::Char('A') => textarea.move_cursor(CursorMove::End),
-
-                    // all the following should have ctrl = true
-                    KeyCode::Char('e') => textarea.scroll((1, 0)),
-                    KeyCode::Char('y') => textarea.scroll((-1, 0)),
-                    KeyCode::Char('d') => textarea.scroll(Scrolling::HalfPageDown),
-                    KeyCode::Char('u') => textarea.scroll(Scrolling::HalfPageUp),
-                    KeyCode::Char('f') => textarea.scroll(Scrolling::PageDown),
-                    KeyCode::Char('b') => textarea.scroll(Scrolling::PageUp),
-                    _ => (),
+            let input = event::read()?.into();
+            match input {
+                Input {
+                    key: Key::Char('q'),
+                    ..
                 }
+                | Input { key: Key::Esc, .. } => break,
+                Input {
+                    key: Key::Char('h'),
+                    ..
+                } => textarea.move_cursor(CursorMove::Back),
+                Input {
+                    key: Key::Char('j'),
+                    ..
+                } => textarea.move_cursor(CursorMove::Down),
+                Input {
+                    key: Key::Char('k'),
+                    ..
+                } => textarea.move_cursor(CursorMove::Up),
+                Input {
+                    key: Key::Char('l'),
+                    ..
+                } => textarea.move_cursor(CursorMove::Forward),
+                Input {
+                    key: Key::Char('w'),
+                    ..
+                } => textarea.move_cursor(CursorMove::WordForward),
+                Input {
+                    key: Key::Char('b'),
+                    ctrl: false,
+                    ..
+                } => textarea.move_cursor(CursorMove::WordBack),
+                Input {
+                    key: Key::Char('^'),
+                    ..
+                } => textarea.move_cursor(CursorMove::Head),
+                Input {
+                    key: Key::Char('$'),
+                    ..
+                } => textarea.move_cursor(CursorMove::End),
+                Input {
+                    key: Key::Char('g'),
+                    ctrl: false,
+                    ..
+                }
+                | Input { key: Key::Home, .. } => textarea.move_cursor(CursorMove::Top),
+                Input {
+                    key: Key::Char('G'),
+                    ctrl: false,
+                    ..
+                }
+                | Input { key: Key::End, .. } => textarea.move_cursor(CursorMove::Bottom),
+                Input {
+                    key: Key::Char('e'),
+                    ctrl: true,
+                    ..
+                } => textarea.scroll((1, 0)),
+                Input {
+                    key: Key::Char('y'),
+                    ctrl: true,
+                    ..
+                } => textarea.scroll((-1, 0)),
+                Input {
+                    key: Key::Char('d'),
+                    ctrl: true,
+                    ..
+                } => textarea.scroll(Scrolling::HalfPageDown),
+                Input {
+                    key: Key::Char('u'),
+                    ctrl: true,
+                    ..
+                } => textarea.scroll(Scrolling::HalfPageUp),
+                Input {
+                    key: Key::Char('f'),
+                    ctrl: true,
+                    ..
+                }
+                | Input {
+                    key: Key::PageDown, ..
+                } => textarea.scroll(Scrolling::PageDown),
+                Input {
+                    key: Key::Char('b'),
+                    ctrl: true,
+                    ..
+                }
+                | Input {
+                    key: Key::PageUp, ..
+                } => textarea.scroll(Scrolling::PageUp),
+
+                _ => (),
             }
         }
     }
