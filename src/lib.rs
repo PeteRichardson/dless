@@ -2,73 +2,98 @@ use clap::Parser;
 use crossterm::{
     event::{self, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
 use ratatui::{
     prelude::{CrosstermBackend, Terminal},
-    widgets::Paragraph,
+    widgets::{Block, Borders},
 };
-use std::fs::read_to_string;
+use std::fs::File;
 
-use std::io::stdout;
-use std::path::PathBuf;
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use std::io;
+use std::io::BufRead;
+use std::path::Path;
 use std::process::ExitCode;
+use tui_textarea::{CursorMove, Scrolling, TextArea};
 
 #[derive(Parser, Debug, Clone)]
 #[command(version, about)]
 pub struct DlessConfig {
     /// log file to view
     #[arg(default_value = "testdata/dlog0.log")]
-    pub file: PathBuf,
+    pub file: String,
+}
+
+fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
+    let file = File::open(filename).expect("no such file");
+    let buf = io::BufReader::new(file);
+    buf.lines()
+        .map(|l| l.expect("Could not parse line"))
+        .collect()
 }
 
 pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std::error::Error>> {
-    stdout().execute(EnterAlternateScreen)?;
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+
     enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let s: String = read_to_string(&config.file)?;
-    let mut x_offset: u16 = 0;
-    let mut y_offset: u16 = 0;
+    let textlog: Vec<String> = lines_from_file(&config.file);
+
+    let mut textarea = TextArea::from(textlog);
+    textarea.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(config.file.clone()),
+    );
 
     loop {
+        terminal.draw(|f| {
+            f.render_widget(textarea.widget(), f.size());
+        })?;
+
         if event::poll(std::time::Duration::from_millis(16))? {
             if let event::Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') => {
-                        break;
-                    }
-                    KeyCode::Up | KeyCode::Char('j') => {
-                        y_offset += 1;
-                    }
-                    KeyCode::Down | KeyCode::Char('k') => {
-                        if y_offset > 0 {
-                            y_offset -= 1;
-                        }
-                    }
+                    KeyCode::Char('q') => break,
+                    KeyCode::Up | KeyCode::Char('j') => textarea.move_cursor(CursorMove::Down),
+                    KeyCode::Down | KeyCode::Char('k') => textarea.move_cursor(CursorMove::Up),
                     KeyCode::Right | KeyCode::Char('l') => {
-                        x_offset += 1;
+                        textarea.move_cursor(CursorMove::Forward)
                     }
-                    KeyCode::Left | KeyCode::Char('h') => {
-                        if x_offset > 0 {
-                            x_offset -= 1;
-                        }
-                    }
-                    _ => {}
+                    KeyCode::Left | KeyCode::Char('h') => textarea.move_cursor(CursorMove::Back),
+                    KeyCode::Char('w') => textarea.move_cursor(CursorMove::WordForward),
+                    //KeyCode::Char('b') => textarea.move_cursor(CursorMove::WordBack),
+                    KeyCode::Char('^') => textarea.move_cursor(CursorMove::Head),
+                    KeyCode::Char('$') => textarea.move_cursor(CursorMove::End),
+                    KeyCode::Char('a') => textarea.move_cursor(CursorMove::Forward),
+                    KeyCode::Char('A') => textarea.move_cursor(CursorMove::End),
+
+                    // all the following should have ctrl = true
+                    KeyCode::Char('e') => textarea.scroll((1, 0)),
+                    KeyCode::Char('y') => textarea.scroll((-1, 0)),
+                    KeyCode::Char('d') => textarea.scroll(Scrolling::HalfPageDown),
+                    KeyCode::Char('u') => textarea.scroll(Scrolling::HalfPageUp),
+                    KeyCode::Char('f') => textarea.scroll(Scrolling::PageDown),
+                    KeyCode::Char('b') => textarea.scroll(Scrolling::PageUp),
+                    _ => (),
                 }
             }
         }
-
-        terminal.draw(|frame| {
-            let area = frame.size();
-            let p = Paragraph::new(s.clone()).scroll((y_offset, x_offset));
-            frame.render_widget(p, area);
-        })?;
     }
 
-    stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
+    crossterm::execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
     Ok(ExitCode::SUCCESS)
 }
