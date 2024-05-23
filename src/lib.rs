@@ -1,20 +1,14 @@
 use clap::Parser;
-use crossterm::{
-    event::{self},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::event::{self};
 use ratatui::{
+    prelude::{Backend, Terminal},
     prelude::{Color, Style},
-    prelude::{CrosstermBackend, Terminal},
     widgets::{Block, Borders},
 };
-use std::fs::File;
-
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
-use std::io;
-use std::io::BufRead;
-use std::path::Path;
-use std::process::ExitCode;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, Result},
+};
 use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 
 #[derive(Parser, Debug, Clone)]
@@ -22,37 +16,38 @@ use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 pub struct DlessConfig {
     /// log file to view
     #[arg(default_value = "testdata/dlog0.log")]
-    pub file: String,
+    pub filename: String,
 }
 
-fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
-    let file = File::open(filename).expect("no such file");
-    let buf = io::BufReader::new(file);
-    buf.lines()
-        .map(|l| l.expect("Could not parse line"))
-        .collect()
+/// App holds the state of the application
+pub struct App {
+    filename: String,   // name of the log file to view
+    lines: Vec<String>, // lines of the log file
 }
 
-pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std::error::Error>> {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
+impl App {
+    pub fn new(config: &DlessConfig) -> Self {
+        let file = File::open(config.filename.clone()).expect("no such file");
+        let buf = BufReader::new(file);
+        let textloglines = buf
+            .lines()
+            .map(|l| l.expect("Could not parse line"))
+            .collect();
 
-    enable_raw_mode()?;
-    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        Self {
+            filename: config.filename.to_owned(),
+            lines: textloglines,
+        }
+    }
+}
 
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    terminal.clear()?;
-
-    let textlog: Vec<String> = lines_from_file(&config.file);
-
-    let mut textarea = TextArea::from(textlog);
+pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
+    let mut textarea = TextArea::from(app.lines.clone());
     textarea.set_line_number_style(Style::default().fg(Color::DarkGray));
     textarea.set_block(
         Block::default()
             .borders(Borders::ALL)
-            //.style(Style::default().fg(Color::Black).bg(Color::White))
-            .title(config.file.clone()),
+            .title(app.filename.clone()),
     );
 
     loop {
@@ -149,19 +144,9 @@ pub fn dless(config: &DlessConfig) -> std::result::Result<ExitCode, Box<dyn std:
                 | Input {
                     key: Key::PageUp, ..
                 } => textarea.scroll(Scrolling::PageUp),
-
                 _ => (),
             }
         }
     }
-
-    disable_raw_mode()?;
-    crossterm::execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    Ok(ExitCode::SUCCESS)
+    Ok(())
 }
