@@ -1,8 +1,9 @@
 use clap::Parser;
 use crossterm::event::{self};
 use ratatui::{
-    prelude::{Backend, Color, Style, Terminal},
-    widgets::{Block, Borders},
+    prelude::{Backend, Color, Constraint, Layout, Line, Modifier, Style, Terminal, Text},
+    style::Stylize,
+    widgets::{Block, Borders, Paragraph},
 };
 use std::{
     fs::File,
@@ -40,7 +41,9 @@ impl App {
     }
 }
 
-fn ui<'a>(app: App) -> TextArea<'a> {
+pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
+    let horizontal = Layout::horizontal([Constraint::Length(20), Constraint::Min(1)]);
+
     let mut textarea = TextArea::from(app.lines.clone());
     textarea.set_line_number_style(Style::default().fg(Color::DarkGray));
     textarea.set_block(
@@ -48,15 +51,20 @@ fn ui<'a>(app: App) -> TextArea<'a> {
             .borders(Borders::ALL)
             .title(app.filename.clone()),
     );
-    textarea
-}
-
-pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
-    let mut textarea = ui(app).to_owned();
 
     loop {
         terminal.draw(|f| {
-            f.render_widget(textarea.widget(), f.size());
+            let (msg, style) = (
+                vec!["Press ".into(), "q".bold(), " to exit, ".into()],
+                Style::default()
+                    .add_modifier(Modifier::ITALIC)
+                    .bg(Color::White),
+            );
+            let [help_area, log_area] = horizontal.areas(f.size());
+            let text = Text::from(Line::from(msg)).patch_style(style);
+            let help_message = Paragraph::new(text);
+            f.render_widget(help_message, help_area);
+            f.render_widget(textarea.widget(), log_area);
         })?;
 
         if event::poll(std::time::Duration::from_millis(16))? {
