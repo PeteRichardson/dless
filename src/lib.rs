@@ -1,8 +1,7 @@
 use clap::Parser;
 use crossterm::event::{self};
 use ratatui::{
-    prelude::{Backend, Terminal},
-    prelude::{Color, Style},
+    prelude::{Backend, Color, Style, Terminal},
     widgets::{Block, Borders},
 };
 use std::{
@@ -41,7 +40,7 @@ impl App {
     }
 }
 
-pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
+fn ui<'a>(app: App) -> TextArea<'a> {
     let mut textarea = TextArea::from(app.lines.clone());
     textarea.set_line_number_style(Style::default().fg(Color::DarkGray));
     textarea.set_block(
@@ -49,6 +48,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
             .borders(Borders::ALL)
             .title(app.filename.clone()),
     );
+    textarea
+}
+
+pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
+    let mut textarea = ui(app).to_owned();
 
     loop {
         terminal.draw(|f| {
