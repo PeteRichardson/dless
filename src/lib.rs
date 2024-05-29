@@ -78,18 +78,24 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> Result<()> {
                 Input {
                     key: Key::Char('h'),
                     ..
-                } => textarea.move_cursor(CursorMove::Back),
+                }
+                | Input { key: Key::Left, .. } => textarea.move_cursor(CursorMove::Back),
                 Input {
                     key: Key::Char('j'),
                     ..
-                } => textarea.move_cursor(CursorMove::Down),
+                }
+                | Input { key: Key::Down, .. } => textarea.move_cursor(CursorMove::Down),
                 Input {
                     key: Key::Char('k'),
                     ..
-                } => textarea.move_cursor(CursorMove::Up),
+                }
+                | Input { key: Key::Up, .. } => textarea.move_cursor(CursorMove::Up),
                 Input {
                     key: Key::Char('l'),
                     ..
+                }
+                | Input {
+                    key: Key::Right, ..
                 } => textarea.move_cursor(CursorMove::Forward),
                 Input {
                     key: Key::Char('w'),
